@@ -108,6 +108,10 @@ export default {
 > [!TIP]
 > Keep a palette muted and close in value, and let `load` do the work: around 0.9 for solid paint, 0.3 to 0.5 for dry, broken edges.
 
+## 🤖 For coding agents
+
+The [painterly skill](.agents/skills/painterly/SKILL.md) teaches an agent how the engine paints, how to add new elements, and how the four example scenes were built.
+
 ## 📄 License
 
 MIT
