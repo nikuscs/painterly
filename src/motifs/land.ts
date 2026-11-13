@@ -1,5 +1,5 @@
 import { scumble } from '../brushwork.ts'
-import { mix, vary, type ColorLike } from '../color.ts'
+import { adjust, mix, vary, type ColorLike } from '../color.ts'
 import { clamp, curve, lerp, type Pt } from '../math.ts'
 import type { Mask, Painter } from '../painter.ts'
 
@@ -171,5 +171,58 @@ export function castShadow(p: Painter, x: number, y: number, w: number, color: C
       blend: 'multiply',
       opacity: 0.22,
     })
+  }
+}
+
+export type CalcadaOpts = {
+  region: Mask
+  /** Direction the wave rows run along (radians). */
+  angle: number
+  light: ColorLike
+  dark: ColorLike
+  /** Distance between wave rows and the wave length, px. */
+  spacing: number
+  period: number
+  /** Keep the waves out of these spots (e.g. under a caption). */
+  avoid?: (x: number, y: number) => boolean
+}
+
+/** Portuguese pavement: pale limestone setts with rolling bands of dark basalt. */
+export function calcada(p: Painter, o: CalcadaOpts) {
+  const rng = p.rng
+  const m = o.region
+  p.fill(m, { color: o.light, color2: adjust(o.light, -0.04), streak: 0.5, angle: o.angle, load: 1 })
+  const ca = Math.cos(o.angle)
+  const sa = Math.sin(o.angle)
+  // wave bands, in pavement coordinates (u along, v across)
+  const cx = (m.x0 + m.x1) / 2
+  const cy = (m.y0 + m.y1) / 2
+  const R = Math.hypot(m.x1 - m.x0, m.y1 - m.y0) / 2 + o.period
+  const avoid = o.avoid
+  const waveClip = avoid ? p.maskFn((x, y) => (avoid(x, y) ? 0 : m.data[y * p.w + x]), [m.x0, m.y0, m.x1, m.y1]) : m
+  for (let v = -R; v < R; v += o.spacing) {
+    const pts: Pt[] = []
+    for (let u = -R; u <= R; u += o.period / 12) {
+      const w = Math.sin((u / o.period) * Math.PI * 2) * o.spacing * 0.18
+      pts.push([cx + ca * u - sa * (v + w), cy + sa * u + ca * (v + w)])
+    }
+    p.stroke(pts, { color: o.dark, width: o.spacing * 0.15, load: 0.8, grain: 0.6, rough: 0.4, taper: [0, 0], clip: waveClip, smooth: false })
+  }
+  // individual setts: tiny square-ish dabs breaking up both colours
+  const count = Math.round(((m.x1 - m.x0) * (m.y1 - m.y0)) / 60)
+  for (let k = 0; k < count; k++) {
+    const x = rng.range(m.x0, m.x1)
+    const y = rng.range(m.y0, m.y1)
+    if (m.data[Math.floor(y) * p.w + Math.floor(x)] < 0.5) continue
+    const s = rng.range(3, 6)
+    const i = (Math.floor(y) * p.w + Math.floor(x)) * 3
+    const under: [number, number, number] = [p.px[i], p.px[i + 1], p.px[i + 2]]
+    p.stroke(
+      [
+        [x - s / 2, y],
+        [x + s / 2, y + rng.gauss(0, 0.5)],
+      ],
+      { color: adjust(under, rng.range(-0.05, 0.04)), width: s, load: 0.8, grain: 0.5, taper: [0, 0], clip: m },
+    )
   }
 }

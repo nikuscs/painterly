@@ -56,6 +56,11 @@ export type Outfit = {
   shoes: ColorLike
   scarf?: ColorLike
   headscarf?: ColorLike
+  /** Front views: a simple friendly face. */
+  face?: 'smile' | 'open'
+  mustache?: ColorLike
+  /** Apron over the front of the clothes. */
+  apron?: ColorLike
 }
 
 export type FigureOpts = {
@@ -276,6 +281,24 @@ export function figure(p: Painter, b: Body, o: Outfit, f: FigureOpts): Joints {
   p.stroke([add(S, down, 0.1 * hu), add(S, down, 1.6 * hu), hemC], { color: o.topShadow, width: hu * 0.05, load: 0.6, opacity: 0.6, clip: torso })
   p.stroke([add(hemC, j.side, -0.74 * hu), hemC, add(hemC, j.side, 0.74 * hu)], { color: o.topShadow, width: hu * 0.06, load: 0.7, clip: torso })
 
+  if (o.apron) {
+    const a0 = add(S, down, 0.35 * hu)
+    const a1 = add(S, down, 3.3 * hu)
+    const apron = p.blob([
+      add(a0, j.side, -0.32 * hu),
+      add(a0, j.side, 0.32 * hu),
+      add(add(S, down, 1.5 * hu), j.side, 0.5 * hu),
+      add(a1, j.side, 0.62 * hu),
+      add(a1, j.side, -0.62 * hu),
+      add(add(S, down, 1.5 * hu), j.side, -0.5 * hu),
+    ])
+    shade(apron, o.apron, adjust(o.apron, -0.1), hu * 0.25)
+    p.line([add(a0, j.side, -0.3 * hu), add(j.neck, j.side, -0.15 * hu)], { color: adjust(o.apron, -0.15), width: hu * 0.05, wobble: 0.3 })
+    p.line([add(a0, j.side, 0.3 * hu), add(j.neck, j.side, 0.15 * hu)], { color: adjust(o.apron, -0.15), width: hu * 0.05, wobble: 0.3 })
+    const pocket = add(S, down, 2.3 * hu)
+    p.line([add(pocket, j.side, -0.25 * hu), add(pocket, j.side, 0.25 * hu)], { color: adjust(o.apron, -0.15), width: hu * 0.04, wobble: 0.3 })
+  }
+
   for (const i of [0, 1] as const) if (armFront(i ? b.armR : b.armL)) drawArm(i)
 
   // ---- neck and head
@@ -367,6 +390,21 @@ export function figure(p: Painter, b: Body, o: Outfit, f: FigureOpts): Joints {
       const tail = curve(knot[0], knot[1], f.wind + 1.2 + k * 0.5, hu * (0.75 - k * 0.2), k ? -0.5 : 0.7, 6)
       shade(p.tube(tail, (t) => hu * lerp(0.15, 0.04, t) * (1 + 0.4 * Math.sin(t * Math.PI))), k ? adjust(cap, -0.05) : cap, adjust(cap, -0.12), hu * 0.05)
     }
+  }
+
+  // ---- friendly face for front views: happy eyes, smile, rosy cheeks
+  if (b.view === 'front' && o.face) {
+    const F = (dx: number, dy: number): Pt => [hx + dx * hu, hy + dy * hu]
+    const ink = '#3a2a22'
+    for (const ex of [-0.14, 0.14])
+      p.stroke([F(ex - 0.06, 0.04), F(ex, -0.01), F(ex + 0.06, 0.04)], { color: ink, width: hu * 0.035, load: 1, taper: [0.15, 0.15] })
+    for (const cx of [-0.22, 0.22])
+      p.stroke([F(cx - 0.05, 0.14), F(cx + 0.05, 0.145)], { color: '#e58c7c', width: hu * 0.07, load: 0.6, grain: 0.7, opacity: 0.7 })
+    if (o.mustache) p.stroke([F(-0.13, 0.19), F(0, 0.15), F(0.13, 0.19)], { color: o.mustache, width: hu * 0.07, load: 0.95, taper: [0.3, 0.3] })
+    if (o.face === 'open') {
+      const m = p.blob([F(-0.09, 0.22), F(0.09, 0.22), F(0.06, 0.3), F(0, 0.32), F(-0.06, 0.3)])
+      p.fill(m, { color: '#7a3a34', load: 1 })
+    } else p.stroke([F(-0.1, 0.22), F(0, 0.28), F(0.1, 0.22)], { color: '#8a3f36', width: hu * 0.035, load: 1, taper: [0.2, 0.2] })
   }
 
   // ---- neck scarf with tails in the wind

@@ -5,6 +5,10 @@
 Most generative art looks generated. painterly copies how real paint behaves instead: a brush that runs dry along the stroke, bristle streaks, paper tooth showing through, flat shapes with a shadow side. Each illustration is one TypeScript file that paints back to front, like a person would. No image textures or traced references, only code.
 
 <p>
+  <img src="docs/lisbon-miradouro.jpg" width="49%" alt="Lisbon from a miradouro: a jacaranda and a stone pine frame the city, the castle hill and the Tejo, with a couple, a guitarist, a kid with an ice cream and a Portuguese flag" />
+  <img src="docs/lisbon-uphill.jpg" width="49%" alt="A yellow 28 tram climbing a steep Lisbon street under festival bunting, while a kid and a dog chase a pastel de nata and an avô grills sardines" />
+</p>
+<p>
   <img src="docs/porto-golden-hour.jpg" width="49%" alt="Golden hour in Porto: a person on the quay conducting a crew of old tin robots while a seagull steals a francesinha" />
   <img src="docs/laundry-day.jpg" width="49%" alt="Windy clifftop: a woman pegging sheets on a washing line next to a whitewashed cottage" />
 </p>
@@ -13,9 +17,10 @@ Most generative art looks generated. painterly copies how real paint behaves ins
 
 - 🖌️ **A real brush model.** Every mark is a stroke with bristle streaks and paint load; low load gives broken, dry-brush edges.
 - 📄 **Paper tooth.** A seeded grain texture shared by every stroke, so layers sit on the same paper.
-- ☁️ **Ready-made motifs.** Skies, clouds, sea and river reflections, grass, paths, cottages, townhouses, bridges, boats, laundry, gulls.
+- ☁️ **Ready-made motifs.** Skies, clouds, sea and river reflections, grass, paths, calçada, cottages, townhouses, whole cityscapes, castles, bridges, trams, boats, laundry, bunting, flags.
+- 🌳 **Trees.** Stone pines, cypresses, round trees and jacarandas, painted as sunlit clumps of leaves.
 - 🧍 **Posable figures.** A 7-head body with tapered limbs and form shading, posed by joint angles.
-- 🤖 **Tin robots.** Riveted, scuffed, hatched and inked, with expressions.
+- 🐈 **Characters and props.** Friendly faces, tin robots, cats, dogs, gulls, sardines, a francesinha and a pastel de nata.
 - ✍️ **Hand lettering.** Captions and signs painted as brush handwriting.
 - 🎲 **Seeded.** Same seed, same painting; change it for fresh brushwork.
 
@@ -38,10 +43,10 @@ pnpm install
 **2. Paint a scene**
 
 ```sh
-node render.ts scenes/porto-golden-hour.ts
+node render.ts scenes/lisbon-miradouro.ts
 ```
 
-Writes `out/porto-golden-hour.png` at 1600 × 2000 in about 10 seconds.
+Writes `out/lisbon-miradouro.png` at 1600 × 2000 in about 6 seconds. The other scenes are `lisbon-uphill`, `porto-golden-hour` and `laundry-day`.
 
 **3. Repaint it with different brushwork**
 
@@ -96,7 +101,7 @@ export default {
 | Brush | `src/painter.ts` | `stroke`, `line`, masks (`mask`, `polygon`, `blob`, `tube`), `fill`, form-shaded `shape`, `rim`, `finish`, `save` |
 | Noise | `src/noise.ts` | Seeded simplex noise and tileable grain textures |
 | Brushwork | `src/brushwork.ts` | `scumble` (loose strokes over a region) and `hatch` |
-| Motifs | `src/motifs/` | Sky, water, land, buildings, boats, figures, robots, critters and props |
+| Motifs | `src/motifs/` | Sky, water, land, trees, buildings, trams, boats, figures, critters and props |
 | Lettering | `src/hand.ts` | `handwrite` for captions and signs |
 | Scenes | `scenes/` | One file per illustration |
 

@@ -192,10 +192,12 @@ export function smoke(p: Painter, from: Pt, o: { wind: number; length: number; c
   const spread = o.spread ?? 0.25
   for (let i = 0; i < 160; i++) {
     const t = rng.next() ** 1.6
-    const x = from[0] + Math.cos(o.wind) * o.length * t + p.noise.noise(t * 3, 9) * 30 * t
-    const y = from[1] + Math.sin(o.wind) * o.length * t - 40 * Math.sin(t * Math.PI * 0.5) + rng.gauss(0, 12 + 50 * t * spread)
+    // drift along the wind, billowing out sideways (perpendicular to the drift) as it goes
+    const off = rng.gauss(0, 12 + 50 * t * spread) + p.noise.noise(t * 3, 9) * 30 * t
+    const x = from[0] + Math.cos(o.wind) * o.length * t - Math.sin(o.wind) * off
+    const y = from[1] + Math.sin(o.wind) * o.length * t + Math.cos(o.wind) * off - 40 * Math.sin(t * Math.PI * 0.5) * Math.abs(Math.cos(o.wind))
     const len = lerp(20, 140, t) * rng.range(0.6, 1.2)
-    p.stroke(curve(x - len / 2, y, o.wind + rng.gauss(0, 0.1), len, rng.gauss(0, 0.15), 4), {
+    p.stroke(curve(x - (Math.cos(o.wind) * len) / 2, y - (Math.sin(o.wind) * len) / 2, o.wind + rng.gauss(0, 0.1), len, rng.gauss(0, 0.15), 4), {
       color: vary(rng, o.color, 0.02, 0.003),
       width: lerp(10, 30, t) * rng.range(0.6, 1.2),
       load: lerp(0.95, 0.35, t),
@@ -405,4 +407,151 @@ export function basket(p: Painter, x: number, y: number, w: number, h: number, c
     ],
     { color: adjust(color, 0.06), width: 6, load: 0.9, taper: [0, 0] },
   )
+}
+
+/** Festival bunting: paper flags hanging from a sagging string. */
+export function bunting(p: Painter, a: Pt, b: Pt, o: { sag: number; size: number; colors: ColorLike[]; string: ColorLike }) {
+  const rng = p.rng
+  const at = sagLine(a, b, o.sag)
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+  const n = Math.max(2, Math.floor(len / (o.size * 1.25)))
+  const pts: Pt[] = []
+  for (let i = 0; i <= 30; i++) pts.push(at(i / 30))
+  for (let i = 0; i < n; i++) {
+    const t0 = (i + 0.12) / n
+    const t1 = (i + 0.88) / n
+    const p0 = at(t0)
+    const p1 = at(t1)
+    const mid = at((t0 + t1) / 2)
+    const swing = rng.gauss(0, 0.12)
+    const tip: Pt = [mid[0] + Math.sin(swing) * o.size, mid[1] + Math.cos(swing) * o.size]
+    const flag = p.polygon([p0, p1, tip], 0.5)
+    const c = o.colors[i % o.colors.length]
+    p.shape(flag, { color: c, shadow: adjust(c, -0.1), lightAngle: -0.6, depth: o.size * 0.25, angle: Math.PI / 2 })
+  }
+  p.line(pts, { color: o.string, width: 1.6, wobble: 0.3 })
+}
+
+/** Street sardine grill: charcoal brazier on legs, glowing coals, a row of sardines. Returns where the smoke rises. */
+export function grill(p: Painter, x: number, y: number, w: number, ink: ColorLike): Pt {
+  const h = w * 0.35
+  for (const dx of [-0.42, 0.42]) p.line([[x + dx * w, y - h], [x + dx * w * 1.05, y]], { color: ink, width: w * 0.025, wobble: 0.3 })
+  const box: Pt[] = [
+    [x - w / 2, y - h],
+    [x + w / 2, y - h],
+    [x + w * 0.46, y - h * 1.6],
+    [x - w * 0.46, y - h * 1.6],
+  ]
+  const m = p.polygon(box, 0.6)
+  p.shape(m, { color: '#4a4746', shadow: '#2c2a2a', light: '#77716c', lightAngle: -0.6, depth: w * 0.08, angle: 0 })
+  p.line([...box, box[0]], { color: ink, width: 2, wobble: 0.5 })
+  // coals glowing through the grate
+  for (let k = 0; k < 18; k++) {
+    const cx = x + p.rng.range(-0.42, 0.42) * w
+    p.stroke([[cx, y - h * 1.62], [cx + w * 0.04, y - h * 1.6]], { color: p.rng.pick(['#f0703a', '#f6b04a', '#d4442f']), width: w * 0.03, load: 0.9 })
+  }
+  for (let k = 0; k <= 6; k++) p.line([[x - w * 0.46, y - h * 1.6 - k * 2], [x + w * 0.46, y - h * 1.6 - k * 2]], { color: '#2a2828', width: 1, opacity: 0.6, wobble: 0 })
+  return [x, y - h * 1.7]
+}
+
+export type FlagOpts = {
+  /** Where the flag's top corner meets the pole. */
+  at: Pt
+  w: number
+  h: number
+  /** 1 flies to the right, -1 to the left. */
+  dir?: 1 | -1
+  /** Wave strength (0..1) and phase. */
+  wave?: number
+  phase?: number
+  light: number
+  ink: ColorLike
+}
+
+/** Portuguese flag in the wind: green hoist, red fly, armillary sphere and shield on the seam. */
+export function portugueseFlag(p: Painter, o: FlagOpts) {
+  const dir = o.dir ?? 1
+  const wave = o.wave ?? 0.5
+  const ph = o.phase ?? 0.6
+  // cloth surface: u along the fly (0 at the pole), v down; ripples grow toward the free edge
+  const S = (u: number, v: number): Pt => {
+    const ripple = Math.sin(u * Math.PI * 2.2 + ph) * o.h * 0.12 * wave * u
+    const squeeze = 1 - 0.06 * wave * Math.abs(Math.cos(u * Math.PI * 2.2 + ph)) * u
+    return [o.at[0] + dir * u * o.w * squeeze, o.at[1] + v * o.h + ripple + v * u * o.h * 0.05 * wave]
+  }
+  const region = (u0: number, u1: number): Pt[] => {
+    const pts: Pt[] = []
+    for (let k = 0; k <= 12; k++) pts.push(S(u0 + ((u1 - u0) * k) / 12, 0))
+    for (let k = 12; k >= 0; k--) pts.push(S(u0 + ((u1 - u0) * k) / 12, 1))
+    return pts
+  }
+  const green = p.polygon(region(0, 0.4), 0.4)
+  p.shape(green, { color: '#1f6b3a', shadow: '#154d29', light: '#2f8a4c', lightAngle: o.light, depth: o.h * 0.15 })
+  const red = p.polygon(region(0.4, 1), 0.4)
+  p.shape(red, { color: '#d22b2b', shadow: '#9e1d22', light: '#e8524a', lightAngle: o.light, depth: o.h * 0.15 })
+  // folds: shade the troughs of the ripple
+  for (let k = 0; k < 14; k++) {
+    const u = (k + 0.5) / 14
+    const slope = Math.cos(u * Math.PI * 2.2 + ph)
+    if (slope > -0.2) continue
+    p.stroke([S(u, 0.02), S(u, 0.98)], { color: '#2a1416', width: o.w * 0.05, load: 0.7, blend: 'multiply', opacity: 0.25 * -slope, clip: u < 0.4 ? green : red })
+  }
+  // armillary sphere: golden rings around a shield
+  const [cx, cy] = S(0.4, 0.5)
+  const r = o.h * 0.27
+  p.line(
+    Array.from({ length: 25 }, (_, k) => [cx + Math.cos((k / 24) * Math.PI * 2) * r, cy + Math.sin((k / 24) * Math.PI * 2) * r] as Pt),
+    { color: '#f2c230', width: Math.max(2, r * 0.14), wobble: 0.2, load: 0.95 },
+  )
+  for (const tilt of [-0.45, 0.45])
+    p.line(
+      Array.from({ length: 25 }, (_, k) => {
+        const a = (k / 24) * Math.PI * 2
+        return [cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.32 + Math.cos(a) * r * tilt] as Pt
+      }),
+      { color: '#f2c230', width: Math.max(1.4, r * 0.09), wobble: 0.2, load: 0.95 },
+    )
+  // shield: red border, white field, five blue escutcheons
+  const sw = r * 0.62
+  const shield = (k: number, c: ColorLike) => {
+    const m = p.blob([
+      [cx - sw * k, cy - sw * 0.9 * k],
+      [cx + sw * k, cy - sw * 0.9 * k],
+      [cx + sw * k, cy + sw * 0.3 * k],
+      [cx, cy + sw * 1.05 * k],
+      [cx - sw * k, cy + sw * 0.3 * k],
+    ])
+    p.fill(m, { color: c, load: 1 })
+  }
+  shield(1, '#c8202a')
+  shield(0.68, '#f6f1e4')
+  for (const [dx, dy] of [
+    [0, -0.35],
+    [-0.3, 0],
+    [0, 0],
+    [0.3, 0],
+    [0, 0.35],
+  ])
+    p.fill(
+      p.mask((ctx) => {
+        ctx.beginPath()
+        ctx.ellipse(cx + dx * sw, cy + dy * sw, sw * 0.1, sw * 0.12, 0, 0, Math.PI * 2)
+        ctx.fill()
+      }),
+      { color: '#2b4fa0', load: 1 },
+    )
+  // a light ink edge so it sits with the other hand-drawn bits
+  p.line([...region(0, 1), S(0, 0)], { color: o.ink, width: Math.max(1.3, o.h * 0.015), wobble: 0.4, load: 0.8, opacity: 0.8 })
+}
+
+/** Flagpole with a gilt finial, from base up to top. */
+export function flagpole(p: Painter, base: Pt, top: Pt, width: number, ink: ColorLike) {
+  p.stroke([base, top], { color: '#e9e6df', width, load: 0.95, taper: [0, 0], smooth: false })
+  p.line([base, top], { color: ink, width: Math.max(1.2, width * 0.18), wobble: 0.3, opacity: 0.6 })
+  const ball = p.mask((ctx) => {
+    ctx.beginPath()
+    ctx.arc(top[0], top[1] - width * 0.6, width * 0.9, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  p.shape(ball, { color: '#e8b83a', shadow: '#b8862a', light: '#f8de8a', lightAngle: -2.4, depth: width * 0.5 })
 }

@@ -57,6 +57,17 @@ const GLYPHS: Record<string, Glyph> = {
   '?': { w: 0.44, strokes: [[[0.04, -0.78], [0.14, -0.92], [0.3, -0.92], [0.38, -0.78], [0.3, -0.6], [0.2, -0.48], [0.2, -0.28]], dot(0.2, -0.03)] },
   '-': { w: 0.36, strokes: [[[0.04, -0.25], [0.3, -0.25]]] },
   "'": { w: 0.16, strokes: [[[0.08, -0.95], [0.06, -0.75]]] },
+  '(': { w: 0.24, strokes: [[[0.2, -0.95], [0.07, -0.6], [0.06, -0.2], [0.18, 0.2]]] },
+  ')': { w: 0.24, strokes: [[[0.04, -0.95], [0.17, -0.6], [0.18, -0.2], [0.06, 0.2]]] },
+}
+
+/** Diacritics as small strokes placed over (or under) the previous letter, glyph units relative to its centre. */
+const MARKS: Record<string, Pt[]> = {
+  '\u0301': [[-0.04, -0.62], [0.06, -0.75]], // acute
+  '\u0300': [[-0.06, -0.75], [0.04, -0.62]], // grave
+  '\u0302': [[-0.08, -0.62], [0, -0.74], [0.08, -0.62]], // circumflex
+  '\u0303': [[-0.1, -0.64], [-0.04, -0.7], [0.03, -0.64], [0.1, -0.7]], // tilde
+  '\u0327': [[0, 0], [0.05, 0.1], [-0.04, 0.17]], // cedilla
 }
 
 export type HandOpts = {
@@ -76,7 +87,7 @@ export type HandOpts = {
 /** Measure a line in px. */
 export function handWidth(text: string, size: number) {
   let w = 0
-  for (const ch of text.toLowerCase()) w += ((GLYPHS[ch] ?? GLYPHS[' ']).w + 0.07) * size
+  for (const ch of text.toLowerCase().normalize('NFD')) if (!MARKS[ch]) w += ((GLYPHS[ch] ?? GLYPHS[' ']).w + 0.07) * size
   return w
 }
 
@@ -89,7 +100,32 @@ export function handwrite(p: Painter, text: string, x: number, y: number, o: Han
   const sa = Math.sin(o.angle ?? 0)
   let pen = o.align === 'center' ? -handWidth(text, size) / 2 : 0
   const seed = rng.range(0, 100)
-  for (const ch of text.toLowerCase()) {
+  let lastCentre = 0
+  let lastDrift = 0
+  const paint = (pts: Pt[], width: number, smooth: boolean, dot: boolean) =>
+    p.stroke(pts, {
+      color: o.color ?? '#2c2a28',
+      width: size * (o.weight ?? 0.085) * width,
+      load: 0.95,
+      dryEnd: 0.15,
+      edgeDry: 0.2,
+      grain: 0.45,
+      rough: 0.15,
+      taper: dot ? [0, 0] : [0.08, 0.2],
+      smooth,
+    })
+  const place = (px: number, py: number): Pt => [x + px * ca - py * sa, y + px * sa + py * ca]
+  for (const ch of text.toLowerCase().normalize('NFD')) {
+    const mark = MARKS[ch]
+    if (mark) {
+      paint(
+        mark.map(([mx, my]) => place(lastCentre + (mx + slant * -my) * size, my * size + lastDrift)),
+        0.85,
+        true,
+        false,
+      )
+      continue
+    }
     const g = GLYPHS[ch] ?? GLYPHS[' ']
     // each letter sits a little differently: baseline drift, scale and tilt
     const drift = p.noise.noise(seed + pen / (size * 3), 0.5) * size * 0.06
@@ -104,18 +140,10 @@ export function handwrite(p: Painter, text: string, x: number, y: number, o: Han
         return [x + px * ca - py * sa, y + px * sa + py * ca]
       })
       const isDot = stroke.length === 2 && Math.hypot(stroke[1][0] - stroke[0][0], stroke[1][1] - stroke[0][1]) < 0.05
-      p.stroke(pts, {
-        color: o.color ?? '#2c2a28',
-        width: size * (o.weight ?? 0.085) * (isDot ? 1.5 : 1),
-        load: 0.95,
-        dryEnd: 0.15,
-        edgeDry: 0.2,
-        grain: 0.45,
-        rough: 0.15,
-        taper: isDot ? [0, 0] : [0.08, 0.2],
-        smooth: !g.sharp,
-      })
+      paint(pts, isDot ? 1.5 : 1, !g.sharp, isDot)
     }
+    lastCentre = pen + (g.w / 2) * size
+    lastDrift = drift
     pen += (g.w + 0.07) * size
   }
 }

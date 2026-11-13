@@ -485,7 +485,8 @@ export class Painter {
     const at = (x: number, y: number) => {
       const xi = Math.round(x)
       const yi = Math.round(y)
-      return xi < 0 || yi < 0 || xi >= W || yi >= H ? 0 : m.data[yi * W + xi]
+      // off-canvas counts as inside, so shapes running off the edge don't get a fake rim
+      return xi < 0 || yi < 0 || xi >= W || yi >= H ? 1 : m.data[yi * W + xi]
     }
     const col: RGB = [0, 0, 0]
     for (let y = m.y0; y <= m.y1; y++) {
@@ -557,7 +558,7 @@ export class Painter {
         if (v <= 0) return 0
         const sx = Math.round(x - lx)
         const sy = Math.round(y - ly)
-        const out = sx < 0 || sy < 0 || sx >= W || sy >= this.h ? 1 : 1 - m.data[sy * W + sx]
+        const out = sx < 0 || sy < 0 || sx >= W || sy >= this.h ? 0 : 1 - m.data[sy * W + sx]
         return v * smoothstep(0.3, 0.7, out)
       },
       [m.x0, m.y0, m.x1, m.y1],

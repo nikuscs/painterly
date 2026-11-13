@@ -29,7 +29,7 @@ const ellipse = (p: Painter, x: number, y: number, rx: number, ry: number, rot =
     ctx.fill()
   })
 
-export type Face = 'happy' | 'wow' | 'wink' | 'grin' | 'love'
+export type Face = 'happy' | 'wow' | 'wink' | 'grin' | 'love' | 'effort'
 
 export type RobotOpts = {
   x: number
@@ -346,6 +346,25 @@ export function robot(p: Painter, o: RobotOpts) {
       brow(0.1, 0.05)
       grille(roundRect(...F(0, 0.085), s * 0.06, s * 0.07, s * 0.03, tilt))
       break
+    case 'effort': {
+      // eyes squeezed shut like > <, teeth clenched
+      for (const [ex, k] of [
+        [-0.1, 1],
+        [0.1, -1],
+      ] as const) {
+        const [cx, cy] = F(ex, -0.035)
+        p.shape(ellipse(p, cx, cy, s * 0.066, s * 0.066), { color: '#9c8458', shadow: '#6b5838', light: '#d8c08a', lightAngle: o.light, depth: s * 0.02 })
+        p.shape(ellipse(p, cx, cy, s * 0.048, s * 0.048), { color: adjust(lens, -0.1), shadow: adjust(lens, -0.2), lightAngle: o.light, depth: s * 0.02 })
+        p.stroke([F(ex - k * 0.03, -0.065), F(ex + k * 0.025, -0.035), F(ex - k * 0.03, -0.005)], { color: INK, width: s * 0.016, load: 1, taper: [0.1, 0.1], smooth: false })
+      }
+      brow(-0.1, -0.02)
+      brow(0.1, -0.02)
+      grille([F(-0.12, 0.05), F(0.12, 0.05), F(0.12, 0.11), F(-0.12, 0.11)])
+      // sweat drop
+      const [dx, dy] = F(0.26, -0.12)
+      p.shape(p.blob([[dx, dy - s * 0.035], [dx + s * 0.018, dy], [dx, dy + s * 0.015], [dx - s * 0.018, dy]]), { color: '#9fd3e6', shadow: '#6aa9c2', light: '#e6f7fb', lightAngle: o.light, depth: s * 0.01 })
+      break
+    }
     case 'love':
       eye(-0.1, true, 'heart')
       eye(0.1, true, 'heart')
@@ -526,3 +545,258 @@ export function note(p: Painter, x: number, y: number, s: number, color: ColorLi
   )
 }
 
+
+/** Pastel de nata tumbling: fluted flaky cup, custard top with scorched spots, speed lines. (x, y) is its centre. */
+export function nata(p: Painter, x: number, y: number, r: number, tilt = 0.5) {
+  const rng = p.rng
+  const light = -0.6
+  const c = Math.cos(tilt)
+  const sn = Math.sin(tilt)
+  const R = (u: number, v: number): Pt => [x + (u * c - v * sn) * r, y + (u * sn + v * c) * r]
+  // speed lines trailing uphill (to the right)
+  for (let k = 0; k < 4; k++) {
+    const yy = y - r * 0.5 + k * r * 0.35
+    p.stroke(
+      [
+        [x + r * 1.3, yy],
+        [x + r * (2.1 + rng.range(0, 0.9)), yy - r * 0.3],
+      ],
+      { color: INK, width: Math.max(1.5, r * 0.05), load: 0.8, taper: [0.1, 0.5], opacity: 0.7 },
+    )
+  }
+  // fluted cup, wider at the top
+  const cm = p.blob([R(-1, -0.15), R(-0.5, -0.05), R(0.5, -0.05), R(1, -0.15), R(0.8, 0.75), R(0, 0.82), R(-0.8, 0.75)])
+  p.shape(cm, { color: '#d9984a', shadow: '#9e6229', light: '#f0c27a', lightAngle: light, depth: r * 0.35, angle: tilt + Math.PI / 2 })
+  for (let k = 1; k < 8; k++) {
+    const t = k / 8
+    p.line([R(-1 + 2 * t, -0.1), R(-0.78 + 1.56 * t, 0.76)], { color: '#8e5524', width: Math.max(1.2, r * 0.04), clip: cm, opacity: 0.75, wobble: 0.3 })
+  }
+  // custard top: an ellipse with a burnt, blistered surface
+  const top = p.mask((ctx) => {
+    ctx.beginPath()
+    ctx.ellipse(...R(0, -0.15), r * 0.98, r * 0.36, tilt, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  p.shape(top, { color: '#c9853c', shadow: '#9e6229', lightAngle: light, depth: r * 0.1 })
+  const custard = p.mask((ctx) => {
+    ctx.beginPath()
+    ctx.ellipse(...R(0, -0.17), r * 0.8, r * 0.26, tilt, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  p.shape(custard, { color: '#f4cf58', shadow: '#e2a93b', light: '#fbe58e', lightAngle: light, depth: r * 0.12 })
+  for (let k = 0; k < 9; k++) {
+    const [sx, sy] = R(rng.range(-0.6, 0.6), -0.17 + rng.range(-0.15, 0.15))
+    p.stroke([[sx - r * 0.07, sy], [sx + r * 0.07, sy + r * 0.02]], { color: rng.pick(['#4a2a14', '#6e3c1c']), width: r * rng.range(0.08, 0.15), load: 0.85, grain: 0.6, clip: custard })
+  }
+  outline(p, [R(-1, -0.15), R(-0.5, -0.32), R(0.5, -0.32), R(1, -0.15), R(0.8, 0.75), R(0, 0.82), R(-0.8, 0.75)], Math.max(1.5, r * 0.035))
+}
+
+/** A silver sardine, for gulls to steal. Centred at (x, y), pointing along `angle`. */
+export function sardine(p: Painter, x: number, y: number, len: number, angle = 0) {
+  const c = Math.cos(angle)
+  const sn = Math.sin(angle)
+  const R = (u: number, v: number): Pt => [x + (u * c - v * sn) * len, y + (u * sn + v * c) * len]
+  const body = [R(-0.42, 0), R(-0.2, -0.1), R(0.2, -0.11), R(0.48, -0.03), R(0.5, 0.01), R(0.2, 0.09), R(-0.2, 0.08)]
+  p.shape(p.blob(body), { color: '#a9bccb', shadow: '#5f7488', light: '#e6eef3', lightAngle: -0.6, depth: len * 0.08, angle })
+  p.stroke([R(-0.3, -0.03), R(0.3, -0.06)], { color: '#3e5f7c', width: len * 0.05, load: 0.8, opacity: 0.8 })
+  p.shape(p.polygon([R(-0.4, 0), R(-0.58, -0.12), R(-0.55, 0.12)], 0.3), { color: '#8ea3b4', shadow: '#5f7488', lightAngle: -0.6, depth: len * 0.03 })
+  p.fill(
+    p.mask((ctx) => {
+      ctx.beginPath()
+      ctx.ellipse(...R(0.38, -0.02), len * 0.022, len * 0.022, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }),
+    { color: '#1d1d1f', load: 1 },
+  )
+  outline(p, body, Math.max(1.2, len * 0.012))
+}
+
+/** Unimpressed cat loafing on a windowsill, tail hanging down. (x, y) is the sill under its front paws. */
+export function cat(p: Painter, x: number, y: number, s: number, fur: ColorLike, stripes: ColorLike) {
+  const light = -0.6
+  const lw = Math.max(1.4, s * 0.02)
+  // tail hanging over the sill
+  const tail: Pt[] = [
+    [x + s * 0.32, y - s * 0.05],
+    [x + s * 0.42, y + s * 0.25],
+    [x + s * 0.36, y + s * 0.55],
+    [x + s * 0.44, y + s * 0.72],
+  ]
+  p.shape(p.tube(tail, (t) => s * (0.11 - 0.04 * t)), { color: fur, shadow: adjust(fur, -0.12), lightAngle: light, depth: s * 0.05 })
+  const body: Pt[] = [
+    [x - s * 0.4, y],
+    [x - s * 0.38, y - s * 0.3],
+    [x - s * 0.1, y - s * 0.42],
+    [x + s * 0.25, y - s * 0.38],
+    [x + s * 0.42, y - s * 0.18],
+    [x + s * 0.4, y],
+  ]
+  p.shape(p.blob(body), { color: fur, shadow: adjust(fur, -0.12), light: adjust(fur, 0.06), lightAngle: light, depth: s * 0.14 })
+  for (let k = 0; k < 4; k++) {
+    const sx = x - s * 0.05 + k * s * 0.1
+    p.stroke(
+      [
+        [sx, y - s * 0.4],
+        [sx + s * 0.03, y - s * 0.22],
+      ],
+      { color: stripes, width: s * 0.04, load: 0.8, taper: [0.1, 0.5] },
+    )
+  }
+  outline(p, body, lw)
+  // head with ears
+  const hx = x - s * 0.32
+  const hy = y - s * 0.4
+  const head: Pt[] = [
+    [hx - s * 0.17, hy + s * 0.08],
+    [hx - s * 0.2, hy - s * 0.08],
+    [hx - s * 0.16, hy - s * 0.26],
+    [hx - s * 0.08, hy - s * 0.15],
+    [hx + s * 0.08, hy - s * 0.15],
+    [hx + s * 0.16, hy - s * 0.26],
+    [hx + s * 0.2, hy - s * 0.08],
+    [hx + s * 0.17, hy + s * 0.08],
+    [hx, hy + s * 0.14],
+  ]
+  p.shape(p.polygon(head, 0.6), { color: fur, shadow: adjust(fur, -0.12), light: adjust(fur, 0.06), lightAngle: light, depth: s * 0.08 })
+  p.line([...head, head[0]], { color: INK, width: lw, wobble: 0.4 })
+  // half-closed, deeply unimpressed eyes
+  for (const side of [-1, 1]) {
+    const ex = hx + side * s * 0.08
+    const ey = hy - s * 0.01
+    p.stroke(
+      [
+        [ex - s * 0.045, ey],
+        [ex + s * 0.045, ey],
+      ],
+      { color: INK, width: s * 0.025, load: 1, taper: [0.1, 0.1] },
+    )
+    p.stroke(
+      [
+        [ex - s * 0.035, ey + s * 0.012],
+        [ex + s * 0.035, ey + s * 0.012],
+      ],
+      { color: '#c9d36a', width: s * 0.018, load: 1, taper: [0.2, 0.2] },
+    )
+  }
+  p.stroke(
+    [
+      [hx - s * 0.02, hy + s * 0.06],
+      [hx + s * 0.02, hy + s * 0.06],
+    ],
+    { color: '#c46b6b', width: s * 0.03, load: 1, taper: [0, 0] },
+  )
+  // whiskers
+  for (const side of [-1, 1])
+    for (const k of [-1, 1])
+      p.line(
+        [
+          [hx + side * s * 0.1, hy + s * 0.07],
+          [hx + side * s * 0.28, hy + s * (0.05 + k * 0.03)],
+        ],
+        { color: INK, width: 1, opacity: 0.7, wobble: 0.1 },
+      )
+}
+
+/** Happy scruffy dog mid-gallop, side view. (x, y) is where the feet meet the ground. */
+export function dog(p: Painter, x: number, y: number, s: number, dir: 1 | -1, fur: ColorLike) {
+  const light = -0.6
+  const D = (dx: number, dy: number): Pt => [x + dx * s * dir, y + dy * s]
+  const lw = Math.max(1.5, s * 0.018)
+  const dark = adjust(fur, -0.12)
+  const limb = (pts: Pt[], w: number, c: ColorLike) => {
+    const m = p.tube(pts, () => w * s)
+    p.shape(m, { color: c, shadow: adjust(c, -0.12), lightAngle: light, depth: s * 0.04 })
+  }
+  // far legs, then tail, body, near legs, head
+  limb([D(0.28, -0.42), D(0.42, -0.2), D(0.55, -0.04)], 0.09, dark)
+  limb([D(-0.3, -0.42), D(-0.45, -0.22), D(-0.62, -0.1)], 0.09, dark)
+  limb([D(-0.42, -0.62), D(-0.6, -0.78), D(-0.66, -0.92)], 0.07, fur)
+  const body: Pt[] = [D(-0.48, -0.58), D(-0.2, -0.7), D(0.2, -0.72), D(0.42, -0.6), D(0.4, -0.38), D(0.1, -0.34), D(-0.3, -0.36), D(-0.5, -0.42)]
+  p.shape(p.blob(body), { color: fur, shadow: dark, light: adjust(fur, 0.07), lightAngle: light, depth: s * 0.12 })
+  outline(p, body, lw)
+  limb([D(0.32, -0.42), D(0.5, -0.24), D(0.62, -0.12)], 0.1, fur)
+  limb([D(-0.36, -0.42), D(-0.5, -0.24), D(-0.48, -0.02)], 0.1, fur)
+  // head with floppy ear and tongue out
+  const head: Pt[] = [D(0.36, -0.66), D(0.5, -0.86), D(0.68, -0.88), D(0.84, -0.78), D(0.86, -0.7), D(0.66, -0.62), D(0.46, -0.56)]
+  p.shape(p.blob(head), { color: fur, shadow: dark, light: adjust(fur, 0.07), lightAngle: light, depth: s * 0.08 })
+  outline(p, head, lw)
+  p.stroke([D(0.82, -0.66), D(0.86, -0.58), D(0.83, -0.52)], { color: '#e0727a', width: s * 0.06, load: 1, taper: [0.1, 0.3] })
+  p.fill(
+    p.mask((ctx) => {
+      ctx.beginPath()
+      ctx.ellipse(...D(0.86, -0.76), s * 0.03, s * 0.025, 0, 0, Math.PI * 2)
+      ctx.fill()
+    }),
+    { color: '#1d1d1f', load: 1 },
+  )
+  p.stroke([D(0.64, -0.8), D(0.7, -0.78)], { color: '#1d1d1f', width: s * 0.03, load: 1, taper: [0.2, 0.2] })
+  const ear: Pt[] = [D(0.5, -0.84), D(0.42, -0.94), D(0.34, -0.8), D(0.42, -0.68)]
+  p.shape(p.blob(ear), { color: dark, shadow: adjust(dark, -0.1), lightAngle: light, depth: s * 0.03 })
+  outline(p, ear, lw * 0.8)
+}
+
+/** Manjerico: a little pot of basil with a paper carnation and a tiny flag, the Santo António gift. */
+export function manjerico(p: Painter, x: number, y: number, s: number) {
+  const light = -0.6
+  const lw = Math.max(1.4, s * 0.02)
+  const pot: Pt[] = [
+    [x - s * 0.32, y - s * 0.55],
+    [x + s * 0.32, y - s * 0.55],
+    [x + s * 0.24, y],
+    [x - s * 0.24, y],
+  ]
+  p.shape(p.polygon(pot, 0.5), { color: '#c8673f', shadow: '#94472a', light: '#e08a5c', lightAngle: light, depth: s * 0.12 })
+  p.line([...pot, pot[0]], { color: INK, width: lw, wobble: 0.4 })
+  p.stroke([[x - s * 0.36, y - s * 0.55], [x + s * 0.36, y - s * 0.55]], { color: '#d77a4f', width: s * 0.1, load: 1, taper: [0, 0] })
+  // round basil bush
+  const bush = p.mask((ctx) => {
+    ctx.beginPath()
+    ctx.ellipse(x, y - s * 0.95, s * 0.48, s * 0.42, 0, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  p.shape(bush, { color: '#5f9a4a', shadow: '#3f6f33', light: '#86bd62', lightAngle: light, depth: s * 0.2 })
+  for (let k = 0; k < 40; k++) {
+    const a = p.rng.range(0, Math.PI * 2)
+    const d = p.rng.range(0, s * 0.42)
+    const lx = x + Math.cos(a) * d
+    const ly = y - s * 0.95 + Math.sin(a) * d * 0.85
+    p.stroke([[lx, ly], [lx + s * 0.05, ly - s * 0.02]], { color: p.rng.pick(['#4c8a3c', '#78b058', '#3a6a30']), width: s * 0.06, load: 0.9, clip: bush })
+  }
+  // paper carnation on a stick, and a little flag
+  p.line([[x + s * 0.1, y - s * 1.1], [x + s * 0.2, y - s * 1.55]], { color: '#5a7a3a', width: lw, wobble: 0.2 })
+  const fl = p.mask((ctx) => {
+    ctx.beginPath()
+    ctx.ellipse(x + s * 0.21, y - s * 1.6, s * 0.13, s * 0.11, 0, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  p.shape(fl, { color: '#e2483c', shadow: '#a8302a', light: '#f27a6a', lightAngle: light, depth: s * 0.05 })
+  p.line([[x - s * 0.12, y - s * 1.1], [x - s * 0.18, y - s * 1.6]], { color: '#8a6a48', width: lw, wobble: 0.2 })
+  const flag = p.polygon([[x - s * 0.18, y - s * 1.6], [x - s * 0.5, y - s * 1.55], [x - s * 0.47, y - s * 1.35], [x - s * 0.17, y - s * 1.38]], 0.4)
+  p.shape(flag, { color: '#f6efe0', shadow: '#d8cfbd', lightAngle: light, depth: s * 0.04 })
+  p.line([[x - s * 0.18, y - s * 1.6], [x - s * 0.5, y - s * 1.55], [x - s * 0.47, y - s * 1.35], [x - s * 0.17, y - s * 1.38]], { color: INK, width: lw * 0.8, wobble: 0.3 })
+}
+
+/** Ice cream cone with two scoops and a drip. (x, y) is the tip of the cone. */
+export function iceCream(p: Painter, x: number, y: number, s: number, scoops: [ColorLike, ColorLike] = ['#f2a7b8', '#a8dcc4']) {
+  const light = -2.5
+  const lw = Math.max(1.4, s * 0.025)
+  const cone: Pt[] = [
+    [x, y],
+    [x - s * 0.22, y - s * 0.6],
+    [x + s * 0.22, y - s * 0.6],
+  ]
+  p.shape(p.polygon(cone, 0.4), { color: '#d9a35e', shadow: '#a8743c', light: '#ecc37f', lightAngle: light, depth: s * 0.1 })
+  for (const k of [-1, 1]) for (const t of [0.3, 0.6]) p.line([[x + k * s * 0.22 * (1 - t) - k * s * 0.05, y - s * 0.6 * (1 - t)], [x - k * s * 0.15 * (1 - t), y - s * 0.6 + s * 0.05]], { color: '#a8743c', width: lw * 0.8, opacity: 0.7, wobble: 0.2 })
+  p.line([...cone, cone[0]], { color: INK, width: lw, wobble: 0.4 })
+  for (const [i, c] of scoops.entries()) {
+    const cy = y - s * (0.7 + i * 0.28)
+    const pts: Pt[] = Array.from({ length: 10 }, (_, k) => {
+      const a = (k / 10) * Math.PI * 2
+      const wob = k % 2 ? 0.92 : 1
+      return [x + Math.cos(a) * s * 0.27 * wob, cy + Math.sin(a) * s * 0.2 * wob] as Pt
+    })
+    p.shape(p.blob(pts), { color: c, shadow: adjust(c, -0.1), light: adjust(c, 0.06), lightAngle: light, depth: s * 0.1 })
+    outline(p, pts, lw)
+  }
+  p.stroke([[x + s * 0.18, y - s * 0.66], [x + s * 0.2, y - s * 0.52]], { color: scoops[0], width: s * 0.07, load: 1, taper: [0, 0.3] })
+}
