@@ -1,0 +1,26 @@
+{
+  "name": "painterly",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paint gouache-style illustrations in TypeScript: dry brush strokes, paper grain and hand-lettered captions, all generated in code.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nikuscs/painterly.git"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "render": "node render.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
